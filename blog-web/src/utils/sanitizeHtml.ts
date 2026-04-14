@@ -9,32 +9,49 @@ export function markdownToHtml(markdown: string): string {
   if (!markdown) return ''
 
   let html = markdown
-  let counter = 0
+  const codeBlocks: string[] = []
+  const inlineCodes: string[] = []
 
-  // Step 1: Protect code blocks with placeholders
+  // Step 1: Protect code blocks with placeholders - store escaped content
   html = html.replace(/```([\s\S]*?)```/g, (_, code) => {
-    // Escape HTML in code content, preserve newlines
     const escaped = code
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-    return placeholder('CODE', counter++)
+    const idx = codeBlocks.length
+    codeBlocks.push(escaped)
+    return placeholder('CODE', idx)
   })
 
-  // Step 2: Protect inline code with placeholders
+  // Step 2: Protect inline code with placeholders - store escaped content
   html = html.replace(/`([^`]+)`/g, (_, code) => {
     const escaped = code
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-    return placeholder('INLINE', counter++) + escaped + placeholder('INLINE', counter++)
+    const idx = inlineCodes.length
+    inlineCodes.push(escaped)
+    return placeholder('INLINE', idx)
   })
 
-  // Step 3: Escape HTML in remaining text
+  // Step 3: Escape HTML in remaining text (but not placeholders)
+  // Temporarily replace placeholders before escaping
+  const allPlaceholders: string[] = []
+  html = html.replace(/\x00[^\x00]+\x00/g, (match) => {
+    const idx = allPlaceholders.length
+    allPlaceholders.push(match)
+    return `\x00PLACEHOLDER:${idx}\x00`
+  })
+
   html = html
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+
+  // Restore placeholders
+  html = html.replace(/\x00PLACEHOLDER:(\d+)\x00/g, (_, id) => {
+    return allPlaceholders[parseInt(id)] ?? ''
+  })
 
   // Step 4: Convert markdown syntax to HTML
   // Headers
@@ -82,23 +99,20 @@ export function markdownToHtml(markdown: string): string {
   // Step 8: Restore code blocks
   html = html.replace(/\x00CODE:(\d+)\x00/g, (_, id) => {
     const idx = parseInt(id)
-    const codeMatch = markdown.match(/```[\s\S]*?```/g)
-    if (codeMatch && codeMatch[idx]) {
-      let code = codeMatch[idx].replace(/^```|```$/g, '')
-      return `<pre><code>${code}</code></pre>`
+    if (codeBlocks[idx] !== undefined) {
+      return `<pre><code>${codeBlocks[idx]}</code></pre>`
     }
     return ''
   })
 
   // Step 9: Restore inline code
-  // This is tricky because we need to match pairs
-  // Simplify: just find and restore inline code patterns
-  html = html.replace(/<p>\x00INLINE:(\d+)\x00([\s\S]*?)\x00INLINE:(\d+)\x00<\/p>/g, (_, id1, content, id2) => {
-    return `<p><code>${content}</code></p>`
+  html = html.replace(/\x00INLINE:(\d+)\x00/g, (_, id) => {
+    const idx = parseInt(id)
+    if (inlineCodes[idx] !== undefined) {
+      return `<code>${inlineCodes[idx]}</code>`
+    }
+    return ''
   })
-
-  // Clean up any remaining placeholders
-  html = html.replace(/\x00[^\x00]+\x00/g, '')
 
   // Clean up empty paragraphs
   html = html.replace(/<p><\/p>/g, '')
