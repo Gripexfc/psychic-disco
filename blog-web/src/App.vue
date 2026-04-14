@@ -99,7 +99,14 @@ const displayUsername = computed(() => {
   }
   return authState.username
 })
-const safeDetailHtml = computed(() => sanitizeRichHtml(currentPost.value?.contentHtml ?? ''))
+const safeDetailHtml = computed(() => {
+  const html = currentPost.value?.contentHtml
+  const md = currentPost.value?.content
+  // Prefer contentHtml, fall back to converting content (markdown)
+  if (html) return sanitizeRichHtml(html)
+  if (md) return sanitizeRichHtml(md)
+  return ''
+})
 
 let filterTimer: number | undefined
 let toastTimer: number | undefined
@@ -425,10 +432,13 @@ async function loadPostDetail(slug: string) {
   try {
     const result = await fetchPostDetail(slug)
     currentPost.value = result.data
-    // Generate TOC
-    if (result.data.contentHtml) {
-      detailToc.value = extractToc(result.data.contentHtml)
-      detailTocHtml.value = result.data.contentHtml ? addHeadingIds(result.data.contentHtml) : ''
+    // Generate TOC - extract from contentHtml if available, else from content (markdown)
+    const sourceHtml = result.data.contentHtml || result.data.content || ''
+    if (sourceHtml) {
+      detailToc.value = extractToc(sourceHtml)
+      if (result.data.contentHtml) {
+        detailTocHtml.value = addHeadingIds(result.data.contentHtml)
+      }
     }
     // Increment view count silently
     viewPost(slug).catch(() => {})
