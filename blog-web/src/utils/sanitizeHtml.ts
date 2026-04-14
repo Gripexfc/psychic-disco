@@ -3,11 +3,7 @@ const BLOCKED_TAGS = ['script', 'iframe', 'object', 'embed', 'link', 'style']
 export function markdownToHtml(markdown: string): string {
   if (!markdown) return ''
   let html = markdown
-    // Escape HTML first
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    // Code blocks (before inline code)
+    // Code blocks (before inline code) — no HTML escaping here yet
     .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
     // Inline code
     .replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -32,6 +28,11 @@ export function markdownToHtml(markdown: string): string {
     .replace(/\n/g, '<br>')
   // Wrap in paragraph
   html = '<p>' + html + '</p>'
+  // Now escape HTML characters that are NOT part of the markdown-converted tags
+  html = html
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
   // Clean up empty paragraphs
   html = html.replace(/<p><\/p>/g, '')
   // Wrap consecutive <li> in <ul>
