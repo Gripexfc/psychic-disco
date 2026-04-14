@@ -15,11 +15,12 @@ public class Post {
     private List<String> tags;
     private Boolean published;
     private Long likes;
+    private Long views;
 
     public Post() {}
 
     public Post(Long id, String slug, String title, String excerpt, String content,
-                String contentHtml, String date, List<String> tags, Boolean published, Long likes) {
+                String contentHtml, String date, List<String> tags, Boolean published, Long likes, Long views) {
         this.id = id;
         this.slug = slug;
         this.title = title;
@@ -30,6 +31,7 @@ public class Post {
         this.tags = tags;
         this.published = published;
         this.likes = likes;
+        this.views = views;
     }
 
     // Getters and Setters
@@ -62,4 +64,7 @@ public class Post {
 
     public Long getLikes() { return likes; }
     public void setLikes(Long likes) { this.likes = likes; }
+
+    public Long getViews() { return views; }
+    public void setViews(Long views) { this.views = views; }
 }

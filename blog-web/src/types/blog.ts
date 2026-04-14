@@ -9,6 +9,7 @@ export type BlogPost = {
   tags: string[]
   published: boolean
   likes?: number
+  views?: number
 }
 
 export type SiteInfo = {
@@ -16,6 +17,12 @@ export type SiteInfo = {
   subtitle: string
   bio: string
   authorName?: string
+}
+
+export type SiteStats = {
+  totalPosts: number
+  totalViews: number
+  totalLikes: number
 }
 
 export type ApiError = {

@@ -1,5 +1,6 @@
 package com.openspec.blog.service;
 
+import com.openspec.blog.dto.SiteStats;
 import com.openspec.blog.model.Post;
 import com.openspec.blog.repository.DataRepository;
 import org.springframework.stereotype.Service;
@@ -68,6 +69,32 @@ public class PostService {
                 .collect(Collectors.toList());
     }
 
+    public List<Post> getRelatedPosts(String slug, int limit) {
+        Optional<Post> current = getPostByIdOrSlug(slug);
+        if (current.isEmpty() || current.get().getTags() == null) {
+            return List.of();
+        }
+        List<String> currentTags = current.get().getTags();
+        return getAllPosts().stream()
+                .filter(p -> !p.getSlug().equals(slug) && Boolean.TRUE.equals(p.getPublished()))
+                .filter(p -> p.getTags() != null && p.getTags().stream().anyMatch(currentTags::contains))
+                .sorted(Comparator.comparing(
+                        (Post p) -> (int) p.getTags().stream().filter(currentTags::contains).count()
+                ).reversed()
+                        .thenComparing(Post::getDate, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
+
+    public SiteStats getSiteStats() {
+        List<Post> all = getAllPosts().stream()
+                .filter(p -> Boolean.TRUE.equals(p.getPublished()))
+                .collect(Collectors.toList());
+        long totalViews = all.stream().mapToLong(p -> p.getViews() != null ? p.getViews() : 0).sum();
+        long totalLikes = all.stream().mapToLong(p -> p.getLikes() != null ? p.getLikes() : 0).sum();
+        return new SiteStats(all.size(), totalViews, totalLikes);
+    }
+
     public Post likePost(String idOrSlug) throws IOException {
         List<Post> posts = repository.getAllPosts();
         int index = findPostIndex(posts, idOrSlug);
@@ -87,6 +114,33 @@ public class PostService {
         updated.setTags(post.getTags());
         updated.setPublished(post.getPublished());
         updated.setLikes(normalizeLikes(post.getLikes()) + 1);
+        updated.setViews(normalizeViews(post.getViews()));
+
+        posts.set(index, updated);
+        repository.saveAllPosts(posts);
+        return normalizePost(updated);
+    }
+
+    public Post incrementViews(String idOrSlug) throws IOException {
+        List<Post> posts = repository.getAllPosts();
+        int index = findPostIndex(posts, idOrSlug);
+        if (index < 0) {
+            return null;
+        }
+
+        Post post = posts.get(index);
+        Post updated = new Post();
+        updated.setId(post.getId());
+        updated.setSlug(post.getSlug());
+        updated.setTitle(post.getTitle());
+        updated.setExcerpt(post.getExcerpt());
+        updated.setContent(post.getContent());
+        updated.setContentHtml(post.getContentHtml());
+        updated.setDate(post.getDate());
+        updated.setTags(post.getTags());
+        updated.setPublished(post.getPublished());
+        updated.setLikes(normalizeLikes(post.getLikes()));
+        updated.setViews(normalizeViews(post.getViews()) + 1);
 
         posts.set(index, updated);
         repository.saveAllPosts(posts);
@@ -159,6 +213,7 @@ public class PostService {
         normalized.setTags(post.getTags());
         normalized.setPublished(post.getPublished());
         normalized.setLikes(normalizeLikes(post.getLikes()));
+        normalized.setViews(normalizeViews(post.getViews()));
         return normalized;
     }
 
@@ -166,6 +221,12 @@ public class PostService {
         if (likes == null) return 0L;
         long l = likes.longValue();
         return l >= 0 ? l : 0L;
+    }
+
+    private Long normalizeViews(Number views) {
+        if (views == null) return 0L;
+        long v = views.longValue();
+        return v >= 0 ? v : 0L;
     }
 
     public static String toSlug(String input) {

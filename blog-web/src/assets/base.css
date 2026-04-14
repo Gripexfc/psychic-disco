@@ -10,25 +10,72 @@
     sans-serif;
 }
 
-*,
-*::before,
-*::after {
+/* Dark theme (default) */
+:root, [data-theme="dark"] {
+  --bg-primary: #080b15;
+  --bg-secondary: #0f1629;
+  --bg-glass: rgba(15, 22, 41, 0.8);
+  --text-primary: #eef2ff;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #67e8f9;
+  --accent-hover: #22d3ee;
+  --accent-glow: rgba(103, 232, 249, 0.3);
+  --border: rgba(103, 232, 249, 0.15);
+  --card-bg: rgba(15, 22, 41, 0.6);
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --like-active: #f43f5e;
+  --tag-bg: rgba(103, 232, 249, 0.1);
+  --tag-text: #67e8f9;
+  --input-bg: rgba(15, 22, 41, 0.8);
+  --input-border: rgba(103, 232, 249, 0.3);
+  --nav-bg: rgba(8, 11, 21, 0.85);
+  --page-bg: linear-gradient(135deg, #080b15 0%, #0f1629 50%, #080b15 100%);
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-glass: rgba(255, 255, 255, 0.85);
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --accent: #0891b2;
+  --accent-hover: #06b6d4;
+  --accent-glow: rgba(8, 145, 178, 0.2);
+  --border: rgba(8, 145, 178, 0.2);
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --like-active: #e11d48;
+  --tag-bg: rgba(8, 145, 178, 0.1);
+  --tag-text: #0891b2;
+  --input-bg: rgba(255, 255, 255, 0.9);
+  --input-border: rgba(8, 145, 178, 0.3);
+  --nav-bg: rgba(248, 250, 252, 0.9);
+  --page-bg: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f8fafc 100%);
+}
+
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
 }
 
 body {
   min-height: 100vh;
-  color: #eef2ff;
-  background: #080b15;
+  color: var(--text-primary);
+  background: var(--page-bg);
+  background-attachment: fixed;
   line-height: 1.6;
   font-family: var(--font-stack);
   font-size: 15px;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: color 0.3s ease, background 0.3s ease;
 }
 
 button {
   font-family: inherit;
+  cursor: pointer;
 }

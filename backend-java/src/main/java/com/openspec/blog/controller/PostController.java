@@ -3,6 +3,7 @@ package com.openspec.blog.controller;
 import com.openspec.blog.dto.ApiResponse;
 import com.openspec.blog.dto.CreatePostRequest;
 import com.openspec.blog.dto.ListPostsResponse;
+import com.openspec.blog.dto.SiteStats;
 import com.openspec.blog.model.Post;
 import com.openspec.blog.service.AuthService;
 import com.openspec.blog.service.PostService;
@@ -84,6 +85,46 @@ public class PostController {
         } catch (IOException e) {
             return ResponseEntity.internalServerError()
                     .body(ApiResponse.fail("POST_LIKE_FAILED", "Failed to like post.", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/api/posts/{idOrSlug}/view")
+    public ResponseEntity<ApiResponse<Post>> incrementView(@PathVariable String idOrSlug) {
+        try {
+            Post updated = postService.incrementViews(idOrSlug);
+            if (updated == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ApiResponse.fail("POST_NOT_FOUND", "Post \"" + idOrSlug + "\" was not found."));
+            }
+            return ResponseEntity.ok(ApiResponse.ok(updated));
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.fail("POST_VIEW_FAILED", "Failed to record view.", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/api/posts/{slug}/related")
+    public ResponseEntity<ApiResponse<List<Post>>> getRelatedPosts(
+            @PathVariable String slug,
+            @RequestParam(defaultValue = "3") int limit
+    ) {
+        try {
+            List<Post> related = postService.getRelatedPosts(slug, limit);
+            return ResponseEntity.ok(ApiResponse.ok(related));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.fail("RELATED_POSTS_FAILED", "Failed to load related posts.", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/api/stats")
+    public ResponseEntity<ApiResponse<SiteStats>> getSiteStats() {
+        try {
+            SiteStats stats = postService.getSiteStats();
+            return ResponseEntity.ok(ApiResponse.ok(stats));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.fail("STATS_FAILED", "Failed to load site stats.", e.getMessage()));
         }
     }
 

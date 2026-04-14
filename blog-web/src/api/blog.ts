@@ -1,4 +1,4 @@
-import type { ApiResult, BlogPost, ListPostsResponse, SiteInfo } from '../types/blog'
+import type { ApiResult, BlogPost, ListPostsResponse, SiteInfo, SiteStats } from '../types/blog'
 
 const apiBase = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/api').replace(/\/$/, '')
 const fallbackApiBase = '/api'
@@ -88,6 +88,20 @@ export async function likePost(idOrSlug: string | number) {
   return requestJson<BlogPost>(`/posts/${encodeURIComponent(String(idOrSlug))}/like`, {
     method: 'POST',
   })
+}
+
+export async function viewPost(idOrSlug: string | number) {
+  return requestJson<BlogPost>(`/posts/${encodeURIComponent(String(idOrSlug))}/view`, {
+    method: 'POST',
+  })
+}
+
+export async function fetchRelatedPosts(slug: string, limit = 3) {
+  return requestJson<BlogPost[]>(`/posts/${encodeURIComponent(slug)}/related?limit=${limit}`)
+}
+
+export async function fetchSiteStats() {
+  return requestJson<SiteStats>('/stats')
 }
 
 export async function publishPost(payload: {

@@ -4,6 +4,9 @@ import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, react
 import {
   fetchCurrentUser,
   fetchPostDetail,
+  fetchRelatedPosts,
+  fetchSiteStats,
+  viewPost,
   fetchPosts,
   fetchSiteInfo,
   fetchTags,
@@ -30,6 +33,18 @@ const toastText = ref('')
 const showBackToTop = ref(false)
 const draftSavedAt = ref('')
 const detailBodyRef = ref<HTMLElement | null>(null)
+const currentTheme = ref<'dark' | 'light'>('dark')
+const themeStorageKey = 'open-spec:theme:v1'
+
+function applyTheme(theme: 'dark' | 'light') {
+  currentTheme.value = theme
+  document.documentElement.setAttribute('data-theme', theme)
+  localStorage.setItem(themeStorageKey, theme)
+}
+
+function toggleTheme() {
+  applyTheme(currentTheme.value === 'dark' ? 'light' : 'dark')
+}
 
 const siteInfo = ref<SiteInfo>({
   title: 'EDY.LOG',
@@ -39,6 +54,10 @@ const siteInfo = ref<SiteInfo>({
 const tags = ref<string[]>([])
 const posts = ref<BlogPost[]>([])
 const currentPost = ref<BlogPost | null>(null)
+const relatedPosts = ref<BlogPost[]>([])
+const siteStats = ref({ totalPosts: 0, totalViews: 0, totalLikes: 0 })
+const detailToc = ref<TocItem[]>([])
+const detailTocHtml = ref('')
 
 const filters = reactive({
   search: '',
@@ -232,6 +251,36 @@ function getPostLikes(post: BlogPost) {
   return Number.isFinite(likes) && likes >= 0 ? likes : 0
 }
 
+function getReadingTime(post: BlogPost): number {
+  const content = post.content || ''
+  // Average Chinese reading speed: ~400 chars/min, English: ~200 words/min
+  const chineseChars = (content.match(/[\u4e00-\u9fa5]/g) || []).length
+  const englishWords = (content.replace(/[\u4e00-\u9fa5]/g, ' ').match(/\S+/g) || []).length
+  const totalMinutes = (chineseChars / 400) + (englishWords / 200)
+  return Math.max(1, Math.ceil(totalMinutes))
+}
+
+interface TocItem {
+  id: string
+  text: string
+  level: number
+}
+
+function extractToc(html: string | undefined): TocItem[] {
+  const content = html ?? ''
+  const toc: TocItem[] = []
+  let counter = 0
+  const regex = /<h([2-3])[^>]*>(.*?)<\/h[2-3]>/gi
+  let match
+  while ((match = regex.exec(content)) !== null) {
+    const level = parseInt(match[1] ?? '2')
+    const text = (match[2] ?? '').replace(/<[^>]+>/g, '')
+    const id = `heading-${counter++}`
+    toc.push({ id, text, level })
+  }
+  return toc
+}
+
 function getLikeCooldownLeft(post: BlogPost) {
   const key = postLikeKey(post)
   const remaining = (likeCooldownUntil[key] ?? 0) - likeNow.value
@@ -329,6 +378,8 @@ async function loadSite() {
   try {
     const result = await fetchSiteInfo()
     siteInfo.value = result.data
+    const stats = await fetchSiteStats()
+    siteStats.value = stats.data
   } catch (error) {
     errorText.value = error instanceof Error ? error.message : '加载站点信息失败。'
   }
@@ -368,13 +419,40 @@ async function loadPostDetail(slug: string) {
   detailLoading.value = true
   errorText.value = ''
   currentPost.value = null
+  relatedPosts.value = []
+  detailToc.value = []
+  detailTocHtml.value = ''
   try {
     const result = await fetchPostDetail(slug)
     currentPost.value = result.data
+    // Generate TOC
+    if (result.data.contentHtml) {
+      detailToc.value = extractToc(result.data.contentHtml)
+      detailTocHtml.value = result.data.contentHtml ? addHeadingIds(result.data.contentHtml) : ''
+    }
+    // Increment view count silently
+    viewPost(slug).catch(() => {})
+    // Load related posts
+    const related = await fetchRelatedPosts(slug, 3)
+    relatedPosts.value = related.data
   } catch (error) {
     errorText.value = error instanceof Error ? error.message : '加载文章详情失败。'
   } finally {
     detailLoading.value = false
+  }
+}
+
+function addHeadingIds(html: string): string {
+  let counter = 0
+  return html.replace(/<h([2-3])([^>]*)>(.*?)<\/h[2-3]>/gi, (_, level, attrs, content) => {
+    return `<h${level}${attrs} id="heading-${counter++}">${content}</h${level}>`
+  })
+}
+
+function scrollToHeading(id: string) {
+  const el = document.getElementById(id)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 }
 
@@ -559,6 +637,12 @@ watch(
 )
 
 onMounted(async () => {
+  // Restore theme from localStorage
+  const savedTheme = localStorage.getItem(themeStorageKey) as 'dark' | 'light' | null
+  if (savedTheme) {
+    applyTheme(savedTheme)
+  }
+  
   if (!window.location.hash) {
     window.location.hash = '#/'
   }
@@ -604,6 +688,9 @@ onUnmounted(() => {
         <button class="nav-link" :class="{ active: isPostsRoute || isPostDetail }" @click="navigate('#/posts')">文章</button>
         <button class="nav-link" :class="{ active: isPublishRoute }" @click="navigate('#/publish')">发布</button>
         <button class="nav-link" :class="{ active: isAboutRoute }" @click="navigate('#/about')">关于</button>
+        <button class="nav-link theme-toggle" @click="toggleTheme" :title="currentTheme === 'dark' ? '切换到浅色模式' : '切换到深色模式'">
+          {{ currentTheme === 'dark' ? '🌙' : '☀️' }}
+        </button>
         <button v-if="!authState.isAuthenticated" class="nav-link" :class="{ active: isLoginRoute }" @click="navigate('#/login')">
           登录
         </button>
@@ -624,6 +711,22 @@ onUnmounted(() => {
           <button class="btn btn-main" @click="navigate('#/posts')">阅读文章</button>
           <button class="btn btn-ghost" @click="navigate('#/publish')">发布新文章</button>
         </div>
+        <div class="site-stats">
+          <div class="stat-item">
+            <span class="stat-value">{{ siteStats.totalPosts }}</span>
+            <span class="stat-label">文章</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <span class="stat-value">{{ siteStats.totalViews }}</span>
+            <span class="stat-label">阅读</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <span class="stat-value">{{ siteStats.totalLikes }}</span>
+            <span class="stat-label">点赞</span>
+          </div>
+        </div>
       </section>
 
       <section v-if="route === '#/'" class="featured">
@@ -632,7 +735,7 @@ onUnmounted(() => {
         <p v-if="!loadingPosts && featuredPosts.length === 0">暂无精选文章，稍后重试。</p>
         <div class="card-grid">
           <article v-for="post in featuredPosts" :key="post.id" class="post-card glass">
-            <p class="post-date">{{ post.date }}</p>
+            <p class="post-date">{{ post.date }} <span class="view-count">· {{ getReadingTime(post) }} 分钟</span></p>
             <h3>{{ post.title }}</h3>
             <p>{{ post.excerpt }}</p>
             <button class="text-link" @click="navigate(`#/posts/${post.slug}`)">阅读全文</button>
@@ -653,7 +756,7 @@ onUnmounted(() => {
         <p v-if="!loadingPosts && posts.length === 0">当前暂无文章。</p>
         <div class="card-grid">
           <article v-for="post in posts" :key="post.id" class="post-card glass">
-            <p class="post-date">{{ post.date }}</p>
+            <p class="post-date">{{ post.date }} <span class="view-count">· {{ getReadingTime(post) }} 分钟</span></p>
             <h3>{{ post.title }}</h3>
             <p>{{ post.excerpt }}</p>
             <div class="tag-row">
@@ -697,16 +800,34 @@ onUnmounted(() => {
           <h2>文章加载中...</h2>
         </template>
         <template v-else-if="currentPost">
-          <p class="post-date">{{ currentPost.date }}</p>
+          <p class="post-date">{{ currentPost.date }} <span class="view-count">· 阅读 {{ currentPost.views ?? 0 }}</span> <span class="view-count">· {{ getReadingTime(currentPost) }} 分钟阅读</span></p>
           <h2>{{ currentPost.title }}</h2>
-          <div
-            v-if="currentPost.contentHtml"
-            ref="detailBodyRef"
-            class="detail-content rich-content"
-            @click="handleDetailAreaClick"
-            v-html="safeDetailHtml"
-          ></div>
-          <p v-else class="detail-content">{{ currentPost.content }}</p>
+          <div class="detail-layout">
+            <div class="detail-main">
+              <div
+                v-if="currentPost.contentHtml"
+                ref="detailBodyRef"
+                class="detail-content rich-content"
+                @click="handleDetailAreaClick"
+                v-html="detailTocHtml || safeDetailHtml"
+              ></div>
+              <p v-else class="detail-content">{{ currentPost.content }}</p>
+            </div>
+            <aside v-if="detailToc.length > 0" class="detail-toc">
+              <p class="toc-title">目录</p>
+              <nav>
+                <button
+                  v-for="item in detailToc"
+                  :key="item.id"
+                  class="toc-item"
+                  :class="{ 'toc-h3': item.level === 3 }"
+                  @click="scrollToHeading(item.id)"
+                >
+                  {{ item.text }}
+                </button>
+              </nav>
+            </aside>
+          </div>
           <div class="tag-row detail-tag-row">
             <span v-for="tag in currentPost.tags" :key="tag" class="tag">{{ tag }}</span>
           </div>
@@ -727,6 +848,16 @@ onUnmounted(() => {
               </span>
             </button>
             <button class="btn btn-main" @click="navigate('#/posts')">返回列表</button>
+          </div>
+
+          <div v-if="relatedPosts.length > 0" class="related-posts">
+            <h3>相关文章</h3>
+            <div class="related-list">
+              <article v-for="post in relatedPosts" :key="post.id" class="related-card" @click="navigate(`/posts/${post.slug}`)">
+                <p class="related-title">{{ post.title }}</p>
+                <p class="related-meta">{{ post.date }} · {{ getReadingTime(post) }} 分钟阅读</p>
+              </article>
+            </div>
           </div>
         </template>
         <template v-else>
@@ -856,11 +987,7 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background:
-    radial-gradient(circle at 10% 20%, rgba(0, 224, 255, 0.24), transparent 30%),
-    radial-gradient(circle at 90% 10%, rgba(127, 91, 255, 0.3), transparent 35%),
-    radial-gradient(circle at 20% 90%, rgba(255, 77, 166, 0.2), transparent 28%),
-    linear-gradient(140deg, #090716 0%, #0f1230 45%, #06080f 100%);
+  background: var(--page-bg);
 }
 
 .app-shell {
@@ -869,8 +996,8 @@ onUnmounted(() => {
 }
 
 .glass {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
   border-radius: 1.1rem;
   backdrop-filter: blur(12px);
 }
@@ -880,6 +1007,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 0.9rem 1rem;
+  background: var(--nav-bg);
 }
 
 .brand {
@@ -887,6 +1015,7 @@ onUnmounted(() => {
   font-weight: 700;
   letter-spacing: 0.08em;
   cursor: pointer;
+  color: var(--text-primary);
 }
 
 nav {
@@ -899,7 +1028,7 @@ nav {
 .nav-link {
   border: 0;
   background: transparent;
-  color: #eef2ff;
+  color: var(--text-primary);
   padding: 0.55rem 0.8rem;
   border-radius: 0.7rem;
   cursor: pointer;
@@ -907,12 +1036,21 @@ nav {
 }
 
 .nav-link:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .nav-link.active {
-  background: rgba(147, 197, 253, 0.22);
-  box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.4);
+  background: var(--accent-glow);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.theme-toggle {
+  font-size: 1.1rem;
+  padding: 0.4rem 0.6rem;
+}
+
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .auth-chip {
@@ -955,7 +1093,7 @@ nav {
 }
 
 .eyebrow {
-  color: #93c5fd;
+  color: var(--accent);
   font-size: 0.8rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -965,22 +1103,25 @@ h1 {
   margin-top: 0.6rem;
   font-size: clamp(1.6rem, 3.5vw, 2.5rem);
   line-height: 1.18;
+  color: var(--text-primary);
 }
 
 h2 {
   font-size: clamp(1.25rem, 2.2vw, 1.8rem);
   margin-bottom: 0.9rem;
+  color: var(--text-primary);
 }
 
 h3 {
   margin: 0.35rem 0 0.5rem;
   font-size: 1.1rem;
+  color: var(--text-primary);
 }
 
 .hero-text {
   margin-top: 0.8rem;
   max-width: 70ch;
-  color: #dbeafe;
+  color: var(--text-secondary);
 }
 
 .hero-actions {
@@ -988,6 +1129,44 @@ h3 {
   display: flex;
   gap: 0.7rem;
   flex-wrap: wrap;
+}
+
+.site-stats {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  margin-top: 1.5rem;
+  padding: 0.8rem 1.2rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  width: fit-content;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.stat-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--border);
 }
 
 .btn {
@@ -1004,13 +1183,14 @@ h3 {
 }
 
 .btn-main {
-  background: linear-gradient(135deg, #00e0ff, #7f5bff);
-  color: #051022;
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  color: var(--bg-primary);
 }
 
 .btn-ghost {
-  background: rgba(255, 255, 255, 0.1);
-  color: #eef2ff;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
 }
 
 .card-grid {
@@ -1022,6 +1202,8 @@ h3 {
 .post-card {
   grid-column: span 12;
   padding: 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
   transition:
     transform 0.25s ease,
     border-color 0.25s ease,
@@ -1031,13 +1213,18 @@ h3 {
 
 .post-card:hover {
   transform: translateY(-4px);
-  border-color: rgba(147, 197, 253, 0.7);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.26);
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
 }
 
 .post-date {
-  color: #bfdbfe;
+  color: var(--text-secondary);
   font-size: 0.82rem;
+}
+
+.view-count {
+  color: #94a3b8;
+  font-size: 0.78rem;
 }
 
 .text-link {
@@ -1071,16 +1258,80 @@ h3 {
 
 .tag {
   font-size: 0.76rem;
-  color: #e9d5ff;
-  background: rgba(147, 51, 234, 0.18);
-  border: 1px solid rgba(216, 180, 254, 0.28);
+  color: var(--tag-text);
+  background: var(--tag-bg);
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.2rem 0.55rem;
 }
 
 .detail-content {
   margin: 0.8rem 0 0.4rem;
-  color: #dbeafe;
+  color: var(--text-secondary);
+}
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+  .detail-toc {
+    display: none;
+  }
+}
+
+.detail-main {
+  min-width: 0;
+}
+
+.detail-toc {
+  position: sticky;
+  top: 1rem;
+  padding: 0.8rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.toc-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.6rem;
+}
+
+.toc-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  padding: 0.3rem 0.4rem;
+  cursor: pointer;
+  border-radius: 0.4rem;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.toc-item:hover {
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.toc-h3 {
+  padding-left: 1rem;
+  font-size: 0.78rem;
 }
 
 .detail-actions {
@@ -1201,6 +1452,50 @@ h3 {
   color: #bfdbfe;
 }
 
+.related-posts {
+  margin-top: 2rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border);
+}
+
+.related-posts h3 {
+  font-size: 1rem;
+  margin-bottom: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.related-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.7rem;
+}
+
+.related-card {
+  padding: 0.8rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.related-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.related-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.3rem;
+}
+
+.related-meta {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
 @keyframes likeShimmer {
   from {
     transform: translateX(-130%);
@@ -1303,9 +1598,9 @@ h3 {
 
 .filter-bar input,
 .filter-bar select {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
-  color: #eef2ff;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text-primary);
   border-radius: 0.7rem;
   padding: 0.6rem 0.72rem;
 }
@@ -1316,6 +1611,7 @@ h3 {
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+  color: var(--text-secondary);
 }
 
 .publish-form {
@@ -1328,6 +1624,7 @@ h3 {
   display: grid;
   gap: 0.35rem;
   font-size: 0.92rem;
+  color: var(--text-primary);
 }
 
 .login-card {
@@ -1335,7 +1632,7 @@ h3 {
 }
 
 .login-desc {
-  color: #cbd5e1;
+  color: var(--text-muted);
 }
 
 .login-form {
