@@ -1268,6 +1268,8 @@ h3 {
 .detail-content {
   margin: 0.8rem 0 0.4rem;
   color: var(--text-secondary);
+  line-height: 1.8;
+  font-size: 0.97rem;
 }
 
 .detail-layout {
@@ -1558,22 +1560,117 @@ h3 {
   }
 }
 
+.rich-content :deep(h1),
 .rich-content :deep(h2),
+.rich-content :deep(h3),
+.rich-content :deep(h4) {
+  color: var(--text-primary);
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 1.5rem 0 0.8rem;
+}
+
+.rich-content :deep(h2) {
+  font-size: 1.45rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
 .rich-content :deep(h3) {
-  margin: 0.8rem 0 0.5rem;
+  font-size: 1.2rem;
+}
+
+.rich-content :deep(h4) {
+  font-size: 1.05rem;
 }
 
 .rich-content :deep(p) {
-  margin: 0.6rem 0;
+  color: var(--text-secondary);
+  line-height: 1.8;
+  margin: 0.9rem 0;
+  font-size: 0.97rem;
+}
+
+.rich-content :deep(a) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rich-content :deep(a:hover) {
+  color: var(--accent-hover);
+}
+
+.rich-content :deep(ul),
+.rich-content :deep(ol) {
+  color: var(--text-secondary);
+  margin: 0.8rem 0;
+  padding-left: 1.5rem;
+}
+
+.rich-content :deep(li) {
+  margin: 0.4rem 0;
+  line-height: 1.7;
+}
+
+.rich-content :deep(blockquote) {
+  border-left: 4px solid var(--accent);
+  margin: 1rem 0;
+  padding: 0.5rem 1rem;
+  background: var(--card-bg);
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: var(--text-secondary);
+}
+
+.rich-content :deep(code) {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  background: rgba(103, 232, 249, 0.08);
+  color: var(--accent);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.3rem;
+  font-size: 0.88em;
 }
 
 .rich-content :deep(pre) {
-  background: rgba(2, 6, 23, 0.85);
-  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  padding: 1rem 1.2rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.rich-content :deep(pre code) {
+  background: none;
+  color: var(--text-secondary);
+  padding: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.rich-content :deep(img) {
+  max-width: 100%;
   border-radius: 0.7rem;
-  padding: 0.7rem 0.8rem;
-  overflow: auto;
-  position: relative;
+  margin: 1rem 0;
+}
+
+.rich-content :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+
+.rich-content :deep(.copy-code-btn) {
+  position: absolute;
+  right: 0.6rem;
+  top: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 0.5rem;
+  background: rgba(15, 23, 42, 0.75);
+  color: #e2e8f0;
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+  font-size: 0.74rem;
 }
 
 .rich-content :deep(.copy-code-btn) {
