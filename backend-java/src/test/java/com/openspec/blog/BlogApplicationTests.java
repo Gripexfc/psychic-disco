@@ -103,7 +103,7 @@ class BlogApplicationTests {
                         .param("page", "1")
                         .param("pageSize", "6"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.items").isArray())
                 .andExpect(jsonPath("$.meta.pagination.page").value(1))
                 .andExpect(jsonPath("$.meta.pagination.pageSize").value(6));
     }
@@ -113,7 +113,7 @@ class BlogApplicationTests {
         mockMvc.perform(get("/api/posts")
                         .param("tag", "Vue"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").isArray());
+                .andExpect(jsonPath("$.data.items").isArray());
     }
 
     @Test
@@ -121,7 +121,7 @@ class BlogApplicationTests {
         mockMvc.perform(get("/api/posts")
                         .param("search", "vue"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").isArray());
+                .andExpect(jsonPath("$.data.items").isArray());
     }
 
     @Test

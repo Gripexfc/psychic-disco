@@ -4,13 +4,15 @@ public class SiteInfo {
     private String title;
     private String subtitle;
     private String bio;
+    private String authorName;
 
     public SiteInfo() {}
 
-    public SiteInfo(String title, String subtitle, String bio) {
+    public SiteInfo(String title, String subtitle, String bio, String authorName) {
         this.title = title;
         this.subtitle = subtitle;
         this.bio = bio;
+        this.authorName = authorName;
     }
 
     public String getTitle() { return title; }
@@ -21,4 +23,7 @@ public class SiteInfo {
 
     public String getBio() { return bio; }
     public void setBio(String bio) { this.bio = bio; }
+
+    public String getAuthorName() { return authorName; }
+    public void setAuthorName(String authorName) { this.authorName = authorName; }
 }

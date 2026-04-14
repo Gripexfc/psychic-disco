@@ -15,6 +15,7 @@ export type SiteInfo = {
   title: string
   subtitle: string
   bio: string
+  authorName?: string
 }
 
 export type ApiError = {

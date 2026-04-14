@@ -57,7 +57,7 @@ public class DataRepository {
             String json = Files.readString(siteFile);
             siteCache = objectMapper.readValue(json, SiteInfo.class);
         } else {
-            siteCache = new SiteInfo("My Blog", "", "");
+            siteCache = new SiteInfo("My Blog", "", "", "朋友");
         }
     }
 

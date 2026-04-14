@@ -618,7 +618,7 @@ onUnmounted(() => {
     <main class="content-wrap">
       <section v-if="route === '#/'" class="hero glass">
         <p class="eyebrow">{{ siteInfo.subtitle }}</p>
-        <h1>你好，我是 Edy，记录技术与创作灵感。</h1>
+        <h1>你好，我是 {{ siteInfo.authorName || '朋友' }}，记录技术与创作灵感。</h1>
         <p class="hero-text">{{ siteInfo.bio }}</p>
         <div class="hero-actions">
           <button class="btn btn-main" @click="navigate('#/posts')">阅读文章</button>
